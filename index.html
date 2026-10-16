@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prototipo B – MediaWiki · Crear y publicar una página</title>
+<style>
+:root{
+  --bg:#ffffff; --surface:#f6f7f9; --surface-2:#eef1f5; --line:#d5dae1; --text:#1f2937; --muted:#4b5563;
+  --primary:#1d4ed8; --primary-hover:#1e40af; --on-primary:#ffffff; --link:#1d4ed8;
+  --ok-bg:#ecfdf3; --ok-line:#86d3a5; --ok-text:#14532d; --warn-bg:#fff8e6; --warn-line:#e6b94d; --warn-text:#713f12;
+  --err-bg:#fef2f2; --err-line:#f1a1a1; --err-text:#991b1b; --info-bg:#eef4ff; --info-line:#a9c1f5; --info-text:#1e3a8a;
+  --focus:#1d4ed8; --proto-bg:#24303f; --proto-text:#f3f6fa; --proto-muted:#c7d0db;
+  color-scheme: light;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151a21; --surface:#1c232c; --surface-2:#232c37; --line:#3a4654; --text:#e8edf3; --muted:#b4bfcc;
+    --primary:#7aa2ff; --primary-hover:#9db9ff; --on-primary:#0d1420; --link:#9db9ff;
+    --ok-bg:#12291d; --ok-line:#2f7a4f; --ok-text:#b8f0cf; --warn-bg:#2e2410; --warn-line:#8a6a1f; --warn-text:#f5dd9e;
+    --err-bg:#331618; --err-line:#8c3a3a; --err-text:#ffc9c9; --info-bg:#16233d; --info-line:#3c5a94; --info-text:#c8d8ff;
+    --focus:#9db9ff; --proto-bg:#0b0f14; --proto-text:#eef2f6; --proto-muted:#aab4c0; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151a21; --surface:#1c232c; --surface-2:#232c37; --line:#3a4654; --text:#e8edf3; --muted:#b4bfcc;
+  --primary:#7aa2ff; --primary-hover:#9db9ff; --on-primary:#0d1420; --link:#9db9ff;
+  --ok-bg:#12291d; --ok-line:#2f7a4f; --ok-text:#b8f0cf; --warn-bg:#2e2410; --warn-line:#8a6a1f; --warn-text:#f5dd9e;
+  --err-bg:#331618; --err-line:#8c3a3a; --err-text:#ffc9c9; --info-bg:#16233d; --info-line:#3c5a94; --info-text:#c8d8ff;
+  --focus:#9db9ff; --proto-bg:#0b0f14; --proto-text:#eef2f6; --proto-muted:#aab4c0; color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--surface-2);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Ubuntu,"Helvetica Neue",sans-serif}
+a{color:var(--link);text-decoration:underline;text-underline-offset:2px}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+[hidden]{display:none!important}
+.sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip{position:absolute;left:8px;top:-60px;background:var(--primary);color:var(--on-primary);padding:10px 14px;z-index:50;border-radius:6px}
+.skip:focus{top:8px}
+svg.i{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- prototype controls (outside the system UI) ---------- */
+.proto{background:var(--proto-bg);color:var(--proto-text);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;font-size:14px}
+.proto strong{font-size:14px}
+.proto .grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.proto .lbl{color:var(--proto-muted)}
+.proto button,.proto select{font:inherit;font-size:14px;min-height:36px;padding:4px 10px;border-radius:6px;border:1px solid #5b6b7e;background:transparent;color:var(--proto-text);cursor:pointer}
+.proto button[aria-pressed="true"]{background:var(--proto-text);color:var(--proto-bg);border-color:var(--proto-text)}
+.proto label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.proto input[type=checkbox]{width:18px;height:18px}
+.proto .hint{flex-basis:100%;color:var(--proto-muted);margin:0}
+
+/* ---------- device frame ---------- */
+.stage{padding:16px;overflow-x:auto}
+.device{margin:0 auto;background:var(--bg);container-type:inline-size;container-name:app;border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative;transition:max-width .2s}
+.device[data-device="fit"]{max-width:none}
+.device[data-device="pc"]{width:1280px;max-width:none}
+.device[data-device="tablet"]{width:820px;max-width:none}
+.device[data-device="phone"]{width:390px;max-width:none;border-radius:24px}
+
+/* ---------- system UI ---------- */
+.top{display:flex;align-items:center;gap:16px;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--bg)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:22px;color:var(--text);text-decoration:none;white-space:nowrap}
+.brand .mark{width:30px;height:30px;border-radius:50%;background:conic-gradient(#f59e0b,#ef4444,#a855f7,#f59e0b);display:grid;place-items:center}
+.brand .mark::after{content:"";width:12px;height:12px;border-radius:50%;background:var(--bg)}
+.search{flex:1;max-width:540px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:0 10px;background:var(--bg)}
+.search input{flex:1;border:0;background:transparent;color:var(--text);font:inherit;min-height:42px}
+.search input:focus{outline:none}
+.search:focus-within{outline:3px solid var(--focus);outline-offset:2px}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border:0;background:transparent;color:var(--text);border-radius:8px;cursor:pointer}
+.iconbtn:hover{background:var(--surface-2)}
+.user{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border:0;background:transparent;color:var(--text);font:inherit;cursor:pointer;border-radius:8px}
+.avatar{width:32px;height:32px;border-radius:50%;background:#475569;color:#fff;display:grid;place-items:center}
+.menu-btn{display:none}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr)}
+.side{background:var(--surface);border-right:1px solid var(--line);padding:16px 10px;min-height:600px}
+.side ul{list-style:none;margin:0;padding:0}
+.side a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;color:var(--text);text-decoration:none;min-height:44px}
+.side a:hover{background:var(--surface-2)}
+.side a[aria-current="page"]{background:var(--info-bg);color:var(--info-text);font-weight:600}
+.side h2{font-size:14px;color:var(--muted);font-weight:600;margin:18px 12px 6px}
+.side hr{border:0;border-top:1px solid var(--line);margin:14px 8px}
+main{padding:20px 28px 40px;min-width:0}
+.crumbs ol{list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;padding:0;font-size:15px;color:var(--muted)}
+.crumbs li{display:flex;gap:6px;align-items:center}
+.crumbs li+li::before{content:"›";color:var(--muted)}
+.crumbs a{color:var(--link)}
+h1{font-size:30px;line-height:1.2;margin:0 0 6px}
+h1:focus{outline:none}
+.lead{color:var(--muted);margin:0 0 20px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;border:1px solid transparent;text-decoration:none}
+.btn-primary{background:var(--primary);color:var(--on-primary)}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-secondary{background:var(--bg);color:var(--primary);border-color:var(--primary)}
+.btn-tertiary{background:transparent;color:var(--text);border-color:var(--line)}
+.btn[disabled]{opacity:.65;cursor:progress}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.list{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+.item{border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:start;background:var(--bg)}
+.item .meta{font-size:14px;color:var(--muted);white-space:nowrap}
+.item p{margin:0;color:var(--muted);font-size:15px;grid-column:2/4}
+.item a{font-weight:600}
+.notice{border:1px solid;border-radius:10px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;margin:0 0 16px}
+.notice h2,.notice h3{margin:0 0 4px;font-size:18px}
+.notice p{margin:0}
+.n-info{background:var(--info-bg);border-color:var(--info-line);color:var(--info-text)}
+.n-ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok-text)}
+.n-warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn-text)}
+.n-err{background:var(--err-bg);border-color:var(--err-line);color:var(--err-text)}
+.notice a{color:inherit;font-weight:600}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}
+.card{border:1px solid var(--line);border-radius:10px;padding:16px;background:var(--bg)}
+.card h2{font-size:17px;margin:0 0 10px}
+.card ul{margin:0;padding-left:20px}
+.card li{margin:4px 0}
+.ex{font-size:15px;margin-top:10px}
+.ex dt{font-weight:600}
+.ex dd{margin:0 0 6px}
+label.field{display:block;font-weight:600;margin:0 0 6px}
+.help{font-size:15px;color:var(--muted);margin:6px 0 0}
+input.txt{width:100%;max-width:100%;min-height:52px;font:inherit;font-size:20px;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+input.txt[aria-invalid="true"]{border-color:var(--err-text);border-width:2px}
+input.sm{font-size:16px;min-height:44px}
+.err{color:var(--err-text);font-weight:600;margin:6px 0 0;display:flex;gap:6px;align-items:center}
+.status{font-size:15px;color:var(--ok-text);display:flex;gap:6px;align-items:center}
+/* editor */
+.editor{border:1px solid var(--line);border-radius:10px;background:var(--bg);overflow:hidden}
+.toolbar{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--surface)}
+.toolbar select{font:inherit;font-size:15px;min-height:44px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);padding:0 8px}
+.toolbar .tb{min-width:44px;min-height:44px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text);font:inherit;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.toolbar .tb:hover{background:var(--surface-2)}
+.toolbar .sep{width:1px;height:24px;background:var(--line);margin:0 4px}
+.content{min-height:300px;padding:16px 18px;font-size:17px;line-height:1.6}
+.content:focus{outline:none}
+.editor:focus-within{outline:3px solid var(--focus);outline-offset:2px}
+.content:empty::before{content:attr(data-placeholder);color:var(--muted)}
+.content h2,.render h2{font-size:22px;margin:18px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.content h3,.render h3{font-size:19px;margin:14px 0 6px}
+.linkpop{display:flex;flex-wrap:wrap;gap:8px;align-items:end;padding:10px;border-bottom:1px solid var(--line);background:var(--surface)}
+.linkpop label{font-size:14px;font-weight:600;display:grid;gap:4px}
+.linkpop input{font:inherit;min-height:40px;border:1px solid var(--line);border-radius:6px;padding:0 8px;background:var(--bg);color:var(--text);min-width:200px}
+.preview{border:1px solid var(--line);border-radius:10px;margin-top:16px;background:var(--bg)}
+.preview header{display:flex;align-items:center;gap:8px;padding:8px 8px 8px 16px;border-bottom:1px solid var(--line);background:var(--surface)}
+.preview header h2{font-size:16px;margin:0;flex:1}
+.render{padding:16px 18px;font-size:17px;line-height:1.6}
+.render .auto{font-size:14px;color:var(--muted);margin-top:-4px}
+.summary{margin-top:18px;max-width:640px}
+.actions{margin-top:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;justify-content:space-between;border-top:1px solid var(--line);padding-top:16px}
+.actions .pub{display:grid;gap:6px;justify-items:end}
+.actions .micro{font-size:15px;color:var(--muted);margin:0;max-width:360px;text-align:right}
+.spin{width:18px;height:18px;border:3px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:8px 0 16px;flex-wrap:wrap}
+.tabs button{font:inherit;min-height:44px;padding:0 14px;border:0;border-bottom:3px solid transparent;background:transparent;color:var(--text);cursor:pointer}
+.tabs button[aria-selected="true"]{border-bottom-color:var(--primary);color:var(--primary);font-weight:600}
+.toast{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--ok-line);background:var(--ok-bg);color:var(--ok-text);border-radius:10px;padding:12px 8px 12px 14px;margin:0 0 16px}
+.toast p{margin:0}
+.toast .x{margin-left:auto;color:inherit}
+.hist{display:grid;gap:10px}
+.hist .rev{background:var(--surface);border-radius:8px;padding:12px}
+.badge{display:inline-block;font-size:14px;font-weight:600;border-radius:999px;padding:2px 10px;background:var(--ok-bg);color:var(--ok-text);border:1px solid var(--ok-line)}
+.wikibot{position:absolute;right:16px;bottom:16px;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+dialog{border:1px solid var(--line);border-radius:12px;padding:20px;max-width:440px;background:var(--bg);color:var(--text)}
+dialog::backdrop{background:rgba(15,23,42,.45)}
+dialog h2{margin:0 0 8px;font-size:20px}
+dialog p{margin:0 0 16px;color:var(--muted)}
+.loginwait{display:flex;gap:10px;align-items:center;color:var(--muted);margin-top:12px}
+.flash{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 14px;border-radius:8px;font-size:15px;z-index:20;max-width:90%}
+.mapwrap{max-width:1280px;margin:8px auto 40px;padding:0 16px}
+.mapwrap .card{overflow-x:auto}
+.legend{font-size:15px;color:var(--muted)}
+
+/* ---------- tablet ---------- */
+@container app (max-width: 980px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .side{display:none;min-height:0;border-right:0;border-bottom:1px solid var(--line)}
+  .side.open{display:block}
+  .menu-btn{display:inline-flex}
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .search{max-width:none}
+}
+/* ---------- phone ---------- */
+@container app (max-width: 600px){
+  .top{flex-wrap:wrap;padding:8px 12px;gap:8px}
+  .brand{font-size:19px}
+  .search{order:3;flex-basis:100%}
+  .user .uname{display:none}
+  main{padding:14px 14px 150px}
+  h1{font-size:24px}
+  .item{grid-template-columns:auto 1fr}
+  .item .meta{grid-column:2;white-space:normal}
+  .item p{grid-column:2}
+  .toolbar{flex-wrap:nowrap;overflow-x:auto}
+  .content,.render{font-size:16px;padding:12px}
+  .actions{position:sticky;bottom:0;background:var(--bg);margin:20px -14px 0;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));box-shadow:0 -2px 8px rgba(0,0,0,.08);flex-direction:column;align-items:stretch;z-index:5}
+  .actions .row{order:2;justify-content:space-between}
+  .actions .row .btn{flex:1}
+  .actions .pub{order:1;justify-items:stretch}
+  .actions .pub .btn{width:100%}
+  .actions .micro{text-align:left;max-width:none}
+  .wikibot{right:12px;bottom:12px;padding:0 10px}
+  .wikibot .wl{display:none}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<section class="proto" aria-label="Controles del prototipo">
+  <strong>Prototipo B · controles de evaluación</strong>
+  <span class="lbl">(no forman parte de la interfaz evaluada)</span>
+  <div class="grp" role="group" aria-label="Dispositivo">
+    <span class="lbl">Dispositivo:</span>
+    <button type="button" data-dev="fit" aria-pressed="true">Ajustar</button>
+    <button type="button" data-dev="pc" aria-pressed="false">PC 1280</button>
+    <button type="button" data-dev="tablet" aria-pressed="false">Tableta 820</button>
+    <button type="button" data-dev="phone" aria-pressed="false">Celular 390</button>
+  </div>
+  <div class="grp">
+    <label for="route" class="lbl">Recorrido:</label>
+    <select id="route">
+      <option value="">Elegir…</option>
+      <option value="feliz">Feliz (desde el buscador)</option>
+      <option value="alt">Alternativo (desde «Páginas»)</option>
+      <option value="adv">Adverso (sesión vencida al publicar)</option>
+      <option value="restore">Recuperación (reabrir con borrador)</option>
+    </select>
+  </div>
+  <div class="grp">
+    <label><input type="checkbox" id="expire"> Sesión vencida al publicar</label>
+    <button type="button" id="sample">Pegar contenido de ejemplo</button>
+    <button type="button" id="reopen">Simular cierre y reapertura</button>
+    <button type="button" id="reset">Reiniciar</button>
+  </div>
+  <p class="hint" id="hint" aria-live="polite">Elige un recorrido o empieza a usar la interfaz.</p>
+</section>
+
+<div class="stage">
+<div class="device" id="device" data-device="fit">
+  <header class="top">
+    <button class="iconbtn menu-btn" type="button" id="menuBtn" aria-expanded="false" aria-controls="side" aria-label="Abrir menú">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <a class="brand" href="#p02"><span class="mark" aria-hidden="true"></span>MediaWiki</a>
+    <form class="search" role="search" id="searchForm">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <label for="q" class="sr-only">Buscar en la wiki</label>
+      <input id="q" type="search" placeholder="Buscar en MediaWiki" autocomplete="off">
+    </form>
+    <div class="top-actions">
+      <button class="iconbtn" type="button" data-oos aria-label="Modo lectura">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="15" r="3"/><circle cx="17" cy="15" r="3"/><path d="M10 15h4M4 15V8l2-3M20 15V8l-2-3"/></svg>
+      </button>
+      <button class="user" type="button" data-oos aria-label="Opciones de cuenta de Laura Gómez">
+        <span class="avatar" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.5"/><path d="M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5"/></svg></span>
+        <span class="uname">Laura Gómez</span>
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+  </header>
+  <div class="layout">
+    <nav class="side" id="side" aria-label="Navegación principal">
+      <ul>
+        <li><a href="#" data-oos><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg>Inicio</a></li>
+        <li><a href="#p02" id="navPages"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>Páginas</a></li>
+        <li><a href="#" data-oos><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Cambios recientes</a></li>
+        <li><a href="#" data-oos><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>Configuración</a></li>
+      </ul>
+      <hr>
+      <h2>Navegación</h2>
+      <ul>
+        <li><a href="#" data-oos><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5M16 11a3 3 0 1 0-1-6M17 15c2 .5 3.5 2 4 5"/></svg>Portal de la comunidad</a></li>
+        <li><a href="#" data-oos><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.5"/></svg>Ayuda</a></li>
+        <li><a href="#" data-oos><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6a4 4 0 0 0 5 5l-9 9-3-3 9-9a4 4 0 0 0-2-2z"/></svg>Herramientas</a></li>
+      </ul>
+    </nav>
+    <main id="main" tabindex="-1">
+      <div id="view"></div>
+    </main>
+  </div>
+  <button class="wikibot" type="button" data-oos aria-label="Abrir WikiBot">
+    <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="8" width="14" height="10" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/></svg><span class="wl">WikiBot</span>
+  </button>
+  <div id="flash" class="flash" hidden role="status"></div>
+</div>
+</div>
+
+<dialog id="cancelDlg" aria-labelledby="cdT" aria-describedby="cdD">
+  <h2 id="cdT">¿Descartar este borrador?</h2>
+  <p id="cdD">Se borrará el texto que escribiste y no se publicará nada. Si quieres conservarlo, sigue editando.</p>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn btn-primary" type="button" id="keepBtn">Seguir editando</button>
+    <button class="btn btn-tertiary" type="button" id="discardBtn">Descartar borrador</button>
+  </div>
+</dialog>
+
+<section class="mapwrap" aria-labelledby="mapT">
+  <div class="card">
+    <h2 id="mapT">Mapa de navegación del prototipo B</h2>
+    <p class="legend">Línea continua: navegación de la interfaz. Línea punteada: estados del sistema (espera, error, recuperación). P01–P05 conservan la numeración de A; P06 es nueva.</p>
+<pre class="mermaid">
+flowchart LR
+  P02["P02-B Páginas"] -->|Crear una página| P03["P03-B Elegir título"]
+  P02 -->|Buscar| P01["P01-B Resultados de búsqueda"]
+  P01 -->|Crear la página| P04["P04-B Editor + vista previa"]
+  P03 -->|Continuar al editor| P04
+  P03 -->|Cancelar| P02
+  P01 -->|Abrir página parecida| EX["Página existente (fuera del prototipo)"]
+  P03 -->|Ver página parecida| EX
+  P04 -->|Ver resultados| P01
+  P04 -->|Cancelar y descartar| P02
+  P04 -.->|Publicar: espera| W(["Publicando…"])
+  W -.->|Correcto| P05["P05-B Página publicada + historial"]
+  W -.->|Sesión vencida| P06["P06-B Sesión vencida (nueva)"]
+  P06 -->|Iniciar sesión de nuevo| P04
+  P05 -->|Editar| P04
+  P04 -.->|Reabrir con borrador: Restaurar o Descartar| P04
+</pre>
+  </div>
+</section>
+
+<script>
+(function(){
+'use strict';
+var PAGES=[
+  {t:'Procedimiento de restauración de datos',d:'Pasos para recuperar una base de datos desde la copia más reciente.',e:'Editada hace 3 días'},
+  {t:'Política de respaldos 2025',d:'Frecuencia, retención y responsables de las copias de seguridad.',e:'Editada hace 2 meses'},
+  {t:'Respaldo de servidores de correo',d:'Configuración del respaldo nocturno del servidor de correo.',e:'Editada hace 5 meses'}
+];
+var SAMPLE='<p>Este procedimiento describe los pasos para realizar el respaldo de la información del sistema y garantizar la seguridad de los datos.</p><h2>Pasos del procedimiento</h2><ol><li>Verificar la disponibilidad del servidor y el espacio de almacenamiento.</li><li>Ejecutar el script de respaldo en el servidor.</li><li>Confirmar que el archivo se haya generado correctamente.</li><li>Validar la integridad del respaldo.</li><li>Almacenar el archivo en la ubicación definida.</li></ol><p><a href="#ex">Ver guía de respaldo de datos</a></p>';
+var KEY='protoB-draft';
+var S={query:'',title:'',from:'',content:'',summary:'',preview:false,publishing:false,revs:[],toast:false,tab:'leer',banner:'',draftAt:0,restoreOffer:null,loginWait:false,titleErr:'',p02msg:''};
+var view=document.getElementById('view'), dev=document.getElementById('device');
+var saveTimer=null, tick=null;
+
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function norm(s){return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+var STOP={de:1,la:1,el:1,los:1,las:1,del:1,y:1,en:1,para:1,un:1,una:1};
+function toks(s){return norm(s).split(/[^a-z0-9]+/).filter(function(w){return w.length>2&&!STOP[w];}).map(function(w){return w.slice(0,6);});}
+function similar(q){var a=toks(q); if(!a.length) return []; return PAGES.filter(function(p){var b=toks(p.t); return a.some(function(x){return b.indexOf(x)>=0;});});}
+function exact(q){return PAGES.filter(function(p){return norm(p.t).trim()===norm(q).trim();})[0];}
+function ls(op,v){try{ if(op==='get'){return JSON.parse(localStorage.getItem(KEY)||'null');} if(op==='set'){localStorage.setItem(KEY,JSON.stringify(v));} if(op==='del'){localStorage.removeItem(KEY);} }catch(e){return null;}}
+function words(html){var d=document.createElement('div');d.innerHTML=html;var t=d.textContent.trim();return t?t.split(/\s+/).length:0;}
+function ago(ts){var s=Math.max(1,Math.round((Date.now()-ts)/1000)); if(s<60) return 'hace '+s+' s'; var m=Math.round(s/60); return 'hace '+m+' min';}
+function flash(msg){var f=document.getElementById('flash'); f.textContent=msg; f.hidden=false; clearTimeout(flash.t); flash.t=setTimeout(function(){f.hidden=true;},3500);}
+function hint(t){document.getElementById('hint').textContent=t;}
+
+var ICON={
+ ok:'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>',
+ info:'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
+ warn:'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17v.5"/></svg>',
+ err:'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16v.5"/></svg>',
+ doc:'<svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--link)"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>',
+ x:'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+ plus:'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+ eye:'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+ save:'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg>'
+};
+function crumbs(items){return '<nav class="crumbs" aria-label="Ruta de navegación"><ol>'+items.map(function(it,i){var last=i===items.length-1; return '<li>'+(last||!it[1]?'<span'+(last?' aria-current="page"':'')+'>'+esc(it[0])+'</span>':'<a href="'+it[1]+'">'+esc(it[0])+'</a>')+'</li>';}).join('')+'</ol></nav>';}
+function pageList(list){return '<ul class="list">'+list.map(function(p){return '<li class="item">'+ICON.doc+'<a href="#ex" data-ex="'+esc(p.t)+'">'+esc(p.t)+'</a><span class="meta">'+p.e+'</span><p>'+esc(p.d)+'</p></li>';}).join('')+'</ul>';}
+
+/* same renderer for preview and published page (EV-06) */
+function render(html){
+  var d=document.createElement('div'); d.innerHTML=html; var links=[];
+  Array.prototype.slice.call(d.querySelectorAll('a')).forEach(function(a){a.setAttribute('href','#ex');a.setAttribute('data-ex',a.textContent.trim());});
+  Array.prototype.slice.call(d.querySelectorAll('p')).forEach(function(p){var a=p.querySelectorAll('a'); if(a.length===1&&p.textContent.trim()===a[0].textContent.trim()){links.push(a[0].outerHTML);p.remove();}});
+  Array.prototype.slice.call(d.querySelectorAll('h1')).forEach(function(h){var n=document.createElement('h2');n.innerHTML=h.innerHTML;h.replaceWith(n);});
+  var out=d.innerHTML;
+  if(links.length){out+='<h2>Véase también</h2><p class="auto">Sección creada automáticamente con los enlaces sueltos de la página.</p><ul>'+links.map(function(l){return '<li>'+l+'</li>';}).join('')+'</ul>';}
+  return out||'<p class="auto">Todavía no hay contenido.</p>';
+}
+
+/* ---------------- views ---------------- */
+function vP02(){
+  return crumbs([['Inicio',null],['Páginas']])+
+  (S.p02msg?'<div class="notice n-info">'+ICON.info+'<p>'+S.p02msg+'</p></div>':'')+
+  '<div class="row" style="justify-content:space-between;align-items:flex-start"><div><h1 tabindex="-1">Páginas</h1><p class="lead">Páginas de la wiki del equipo.</p></div>'+
+  '<a class="btn btn-primary" href="#p03" id="createBtn">'+ICON.plus+'Crear una página</a></div>'+pageList(PAGES);
+}
+function vP01(){
+  var q=S.query, sim=similar(q), ex=exact(q);
+  var h=crumbs([['Inicio',null],['Resultados de búsqueda']])+'<div class="cols"><div><h1 tabindex="-1">Resultados de búsqueda</h1><p class="lead">Buscaste «'+esc(q)+'».</p>';
+  if(ex){h+='<div class="notice n-info">'+ICON.info+'<div><h2>Ya existe una página con este título</h2><p><a href="#ex" data-ex="'+esc(ex.t)+'">Abrir «'+esc(ex.t)+'»</a> para editarla.</p></div></div>';}
+  else{
+    h+='<div class="notice n-info">'+ICON.info+'<div><h2>Todavía no existe una página con este título</h2><p>Puedes crearla con el título que buscaste. Antes, revisa si alguna de las páginas parecidas ya cubre el tema.</p>'+
+    '<p style="margin-top:12px"><a class="btn btn-primary" href="#p04" id="createFromSearch">'+ICON.plus+'Crear la página «'+esc(q)+'»</a></p>'+
+    '<p class="status" style="margin-top:10px">'+ICON.ok+'Tienes permiso para crear páginas.</p></div></div>';
+  }
+  h+='<h2 style="font-size:20px;margin:24px 0 4px">'+(sim.length?sim.length+' páginas con títulos parecidos':'No hay páginas con títulos parecidos')+'</h2>'+(sim.length?'<p class="lead" style="margin-bottom:12px">Revisa que no estés duplicando una página existente.</p>'+pageList(sim):'')+'</div>'+guideCard()+'</div>';
+  return h;
+}
+function guideCard(){
+  return '<aside class="card" aria-labelledby="gT"><h2 id="gT">Antes de crear una página</h2><ul><li>Busca si ya existe con otro nombre.</li><li>Usa un título claro y específico.</li><li>Sigue la guía de estilo de la wiki.</li></ul>'+
+  '<dl class="ex"><dt>Título claro</dt><dd>Procedimiento de respaldo de datos</dd><dt>Evita</dt><dd>«Respaldo», «Página nueva de Laura»</dd></dl></aside>';
+}
+function vP03(){
+  var sim=S.title?similar(S.title):[], ex=S.title?exact(S.title):null, msg='';
+  if(S.titleErr){msg='<p class="err" id="tErr">'+ICON.err+esc(S.titleErr)+'</p>';}
+  else if(ex){msg='<div class="notice n-warn" style="margin-top:12px" id="tState">'+ICON.warn+'<div><p><strong>Ya existe una página con este título.</strong> <a href="#ex" data-ex="'+esc(ex.t)+'">Ábrela</a> o elige otro título.</p></div></div>';}
+  else if(S.title&&sim.length){msg='<div class="notice n-warn" style="margin-top:12px" id="tState">'+ICON.warn+'<div><p><strong>Título disponible · '+sim.length+' páginas parecidas.</strong> Revísalas para no duplicar contenido.</p>'+pageList(sim)+'</div></div>';}
+  else if(S.title){msg='<p class="status" id="tState">'+ICON.ok+'Título disponible. No hay páginas parecidas.</p>';}
+  return crumbs([['Inicio',null],['Páginas','#p02'],['Crear página']])+'<div class="cols"><div><h1 tabindex="-1">Elige el título de tu página</h1><p class="lead">El título será el nombre de la página en la wiki.</p>'+
+  '<form id="titleForm" novalidate><label class="field" for="title">Título de la página</label><input class="txt" id="title" value="'+esc(S.title)+'" autocomplete="off" aria-describedby="tHelp'+(S.titleErr?' tErr':'')+'"'+(S.titleErr?' aria-invalid="true"':'')+'>'+
+  '<p class="help" id="tHelp">Ejemplo: Procedimiento de respaldo de datos.</p><div aria-live="polite">'+msg+'</div>'+
+  '<div class="row" style="justify-content:flex-end;margin-top:20px"><a class="btn btn-tertiary" href="#p02">Cancelar</a><button class="btn btn-primary" type="submit"'+(ex?' disabled':'')+'>Continuar al editor</button></div></form></div>'+guideCard()+'</div>';
+}
+function draftStatus(){return S.draftAt?ICON.ok+'Borrador guardado '+ago(S.draftAt):'Se guardará un borrador mientras escribes.';}
+function vP04(){
+  var sim=similar(S.title), b='';
+  if(S.restoreOffer){b='<div class="notice n-info" id="restoreBox">'+ICON.info+'<div><h2>Tienes un borrador sin publicar</h2><p>Guardado '+ago(S.restoreOffer.at)+' ('+words(S.restoreOffer.content)+' palabras).</p><div class="row" style="margin-top:10px"><button class="btn btn-primary" type="button" id="restoreBtn">Restaurar borrador</button><button class="btn btn-tertiary" type="button" id="dropDraftBtn">Descartar</button></div></div></div>';}
+  var h=crumbs([['Inicio',null],['Páginas','#p02'],['Crear página','#p03'],[S.title]])+(S.banner||'')+b+
+  '<div class="cols"><div><h1 tabindex="-1">'+esc(S.title)+'</h1>'+
+  '<p class="status" id="draft" aria-live="polite">'+draftStatus()+'</p>'+
+  (sim.length?'<p class="help">Hay '+sim.length+' páginas con títulos parecidos. <a href="#p01" id="toResults">Ver resultados</a></p>':'')+
+  '<div class="editor" style="margin-top:12px"><div class="toolbar" role="toolbar" aria-label="Formato del texto">'+
+  '<label for="block" class="sr-only">Tipo de bloque</label><select id="block"><option value="p">Párrafo</option><option value="h2">Sección</option><option value="h3">Subsección</option></select><span class="sep" aria-hidden="true"></span>'+
+  '<button class="tb" type="button" data-cmd="bold" aria-label="Negrita">B</button><button class="tb" type="button" data-cmd="italic" aria-label="Cursiva"><i>I</i></button><span class="sep" aria-hidden="true"></span>'+
+  '<button class="tb" type="button" data-cmd="insertOrderedList" aria-label="Lista numerada"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10M4 5h1v3M4 11h2l-2 3h2M4 17h2v3H4"/></svg></button>'+
+  '<button class="tb" type="button" data-cmd="insertUnorderedList" aria-label="Lista con viñetas"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10"/><circle cx="5" cy="6" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="18" r="1"/></svg></button>'+
+  '<button class="tb" type="button" id="linkBtn" aria-label="Insertar enlace" aria-expanded="false" aria-controls="linkPop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button></div>'+
+  '<div class="linkpop" id="linkPop" hidden><label>Texto del enlace<input id="lkText"></label><label>Página o dirección<input id="lkUrl" value="Política de respaldos 2025"></label><button class="btn btn-secondary" type="button" id="lkOk">Insertar</button><button class="btn btn-tertiary" type="button" id="lkNo">Cancelar</button></div>'+
+  '<div class="content" id="content" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Contenido de la página" data-placeholder="Empieza a escribir o pega tu contenido.">'+S.content+'</div></div>'+
+  (S.preview?'<section class="preview" aria-labelledby="pvT"><header>'+ICON.eye+'<h2 id="pvT">Vista previa: así se verá al publicar</h2><button class="iconbtn" type="button" id="pvClose" aria-label="Cerrar vista previa">'+ICON.x+'</button></header><div class="render" id="pvBody">'+render(S.content)+'</div><div class="notice n-warn" style="margin:0 16px 16px">'+ICON.warn+'<p>Los cambios aún no se han publicado.</p></div></section>':'')+
+  '<div class="summary"><label class="field" for="sum">Resumen de edición <span style="font-weight:400;color:var(--muted)">(recomendado)</span></label><input class="txt sm" id="sum" value="'+esc(S.summary)+'" aria-describedby="sumHelp"><p class="help" id="sumHelp">Aparece en el historial para que otras personas entiendan el cambio.</p></div>'+
+  '<div class="actions" id="actions"'+(S.publishing?' aria-busy="true"':'')+'><div class="row"><button class="btn btn-tertiary" type="button" id="cancelBtn"'+(S.publishing?' disabled':'')+'>Cancelar</button>'+
+  '<button class="btn btn-secondary" type="button" id="pvBtn" aria-expanded="'+S.preview+'"'+(S.publishing?' disabled':'')+'>'+ICON.eye+(S.preview?'Ocultar vista previa':'Mostrar vista previa')+'</button></div>'+
+  '<div class="pub"><button class="btn btn-primary" type="button" id="pubBtn"'+(S.publishing?' disabled':'')+' aria-describedby="pubMicro">'+(S.publishing?'<span class="spin" aria-hidden="true"></span>Publicando…':ICON.save+'Publicar página')+'</button>'+
+  '<p class="micro" id="pubMicro">Será visible para todas las personas de la wiki. Podrás editarla después.</p></div></div>'+
+  '<p class="sr-only" aria-live="assertive">'+(S.publishing?'Publicando la página, espera un momento.':'')+'</p>'+
+  '</div><aside class="card" aria-labelledby="qgT"><details open><summary id="qgT" style="cursor:pointer;font-weight:700;min-height:32px">Guía rápida para tu página</summary><ul style="margin-top:8px"><li>Empieza con un párrafo que explique para qué sirve.</li><li>Usa «Sección» para títulos como «Pasos del procedimiento».</li><li>Para pasos en orden, usa la lista numerada.</li><li>Los enlaces sueltos aparecerán al final, en «Véase también».</li></ul><p class="help">No hace falta repetir el título: ya es el nombre de la página.</p></details></aside></div>';
+  return h;
+}
+function vP05(){
+  var r=S.revs[S.revs.length-1]||{n:1,sum:'',bytes:0,at:'Hoy'};
+  var h=crumbs([['Inicio',null],['Páginas','#p02'],[S.title]]);
+  if(S.toast){h+='<div class="toast" id="toast">'+ICON.ok+'<div><p><strong>Página publicada.</strong> «'+esc(S.title)+'» ya está disponible para el equipo y quedó guardada en el historial.</p><p style="margin-top:4px"><a href="#" id="toHist">Ver historial</a></p></div><button class="iconbtn x" type="button" id="toastX" aria-label="Cerrar mensaje">'+ICON.x+'</button></div>';}
+  h+='<h1 tabindex="-1">'+esc(S.title)+'</h1><div class="tabs" role="tablist" aria-label="Vistas de la página">'+
+   ['leer','editar','historial','discusion'].map(function(k){var lab={leer:'Leer',editar:'Editar',historial:'Historial ('+S.revs.length+')',discusion:'Discusión'}[k];return '<button role="tab" type="button" data-tab="'+k+'" aria-selected="'+(S.tab===k)+'">'+lab+'</button>';}).join('')+'</div>';
+  if(S.tab==='historial'){
+    h+='<section aria-label="Historial de la página" class="hist">'+S.revs.slice().reverse().map(function(v){return '<div class="rev"><p style="margin:0"><strong>Revisión '+v.n+'</strong> · Laura Gómez · '+v.at+'</p><p style="margin:4px 0 0">«'+esc(v.sum||'Sin resumen')+'»</p><p style="margin:6px 0 0"><span class="badge">+'+v.bytes.toLocaleString('es-CO')+' bytes</span></p></div>';}).join('')+'</section>';
+  } else {
+    h+='<article class="render" style="padding:0">'+render(S.content)+'</article>';
+  }
+  return h;
+}
+function vP06(){
+  return crumbs([['Inicio',null],['Páginas','#p02'],['Crear página','#p03'],[S.title]])+
+  '<div class="notice n-err">'+ICON.err+'<div><h1 tabindex="-1" style="font-size:24px">Tu sesión se cerró antes de publicar</h1><p>La página no se publicó. Tu texto está a salvo: '+words(S.content)+' palabras guardadas como borrador.</p></div></div>'+
+  '<p>Inicia sesión de nuevo y volverás al editor con tu texto tal como lo dejaste.</p>'+
+  '<div class="row"><button class="btn btn-primary" type="button" id="loginBtn"'+(S.loginWait?' disabled':'')+'>'+(S.loginWait?'<span class="spin" aria-hidden="true"></span>Iniciando sesión…':'Iniciar sesión de nuevo')+'</button>'+
+  '<a class="btn btn-tertiary" href="#p02">Salir sin publicar</a></div>'+
+  '<p class="sr-only" aria-live="assertive">'+(S.loginWait?'Iniciando sesión.':'')+'</p>'+
+  '<details style="margin-top:18px"><summary style="cursor:pointer;min-height:32px">Ver mi texto guardado</summary><div class="render card" style="margin-top:8px">'+render(S.content)+'</div></details>';
+}
+function vEX(name){return crumbs([['Inicio',null],['Páginas','#p02'],[name]])+'<h1 tabindex="-1">'+esc(name)+'</h1><div class="notice n-info">'+ICON.info+'<p>Esta página existente no forma parte del prototipo B. <a href="#" id="back">Volver</a></p></div>';}
+
+/* ---------------- router ---------------- */
+var current='p02', exName='';
+function go(id,keepFocus){
+  if(location.hash!=='#'+id){history.pushState(null,'','#'+id);}
+  show(id,keepFocus);
+}
+function show(id,keepFocus){
+  if(id==='p04'&&!S.title){id='p03';}
+  if((id==='p05'||id==='p06')&&!S.title){id='p02';}
+  var MAP={p01:1,p02:1,p03:1,p04:1,p05:1,p06:1,ex:1}; if(!MAP[id]) id='p02';
+  current=id;
+  var html={p01:vP01,p02:vP02,p03:vP03,p04:vP04,p05:vP05,p06:vP06,ex:function(){return vEX(exName);}}[id];
+  view.innerHTML=html();
+  if(id==='p02'){S.p02msg='';}
+  document.getElementById('navPages').setAttribute('aria-current',(id==='p02'||id==='p03'||id==='p04'||id==='p05'||id==='p06')?'page':'false');
+  document.getElementById('q').value=S.query;
+  document.getElementById('side').classList.remove('open'); document.getElementById('menuBtn').setAttribute('aria-expanded','false');
+  bind(id);
+  if(!keepFocus){var h1=view.querySelector('h1'); if(h1){h1.focus();}}
+}
+window.addEventListener('popstate',function(){show((location.hash||'#p02').slice(1));});
+
+function persist(){
+  S.content=(document.getElementById('content')||{}).innerHTML||S.content;
+  var sum=document.getElementById('sum'); if(sum) S.summary=sum.value;
+  S.draftAt=Date.now(); ls('set',{title:S.title,content:S.content,summary:S.summary,at:S.draftAt});
+  var d=document.getElementById('draft'); if(d) d.innerHTML=draftStatus();
+}
+
+function bind(id){
+  Array.prototype.slice.call(view.querySelectorAll('[data-ex]')).forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();exName=a.getAttribute('data-ex');go('ex');});});
+  if(id==='ex'){document.getElementById('back').addEventListener('click',function(e){e.preventDefault();history.back();});}
+  if(id==='p01'){var c=document.getElementById('createFromSearch'); if(c) c.addEventListener('click',function(e){e.preventDefault(); startEditor(S.query,'search');});}
+  if(id==='p03'){
+    var t=document.getElementById('title'), deb=null;
+    t.addEventListener('input',function(){clearTimeout(deb);deb=setTimeout(function(){S.title=t.value.trim();S.titleErr='';var pos=t.selectionStart;show('p03',true);var n=document.getElementById('title');n.focus();n.setSelectionRange(pos,pos);},350);});
+    document.getElementById('titleForm').addEventListener('submit',function(e){e.preventDefault();S.title=t.value.trim(); if(!S.title){S.titleErr='Escribe un título para continuar.';show('p03',true);document.getElementById('title').focus();return;} if(exact(S.title)) return; startEditor(S.title,'pages');});
+  }
+  if(id==='p04'){
+    var ct=document.getElementById('content');
+    ct.addEventListener('input',function(){S.content=ct.innerHTML;clearTimeout(saveTimer);saveTimer=setTimeout(persist,800);});
+    document.getElementById('sum').addEventListener('input',function(e){S.summary=e.target.value;});
+    Array.prototype.slice.call(view.querySelectorAll('[data-cmd]')).forEach(function(b){b.addEventListener('mousedown',function(e){e.preventDefault();});b.addEventListener('click',function(){ct.focus();document.execCommand(b.getAttribute('data-cmd'));S.content=ct.innerHTML;persist();});});
+    document.getElementById('block').addEventListener('change',function(e){ct.focus();document.execCommand('formatBlock',false,'<'+e.target.value+'>');S.content=ct.innerHTML;persist();});
+    var lp=document.getElementById('linkPop'), lb=document.getElementById('linkBtn'), saved=null;
+    lb.addEventListener('mousedown',function(e){e.preventDefault();var sel=window.getSelection();if(sel.rangeCount&&ct.contains(sel.anchorNode)){saved=sel.getRangeAt(0).cloneRange();}});
+    lb.addEventListener('click',function(){lp.hidden=false;lb.setAttribute('aria-expanded','true');document.getElementById('lkText').value=saved?saved.toString():'';document.getElementById('lkText').focus();});
+    function closeLink(){lp.hidden=true;lb.setAttribute('aria-expanded','false');lb.focus();}
+    document.getElementById('lkNo').addEventListener('click',closeLink);
+    document.getElementById('lkOk').addEventListener('click',function(){var tx=document.getElementById('lkText').value.trim()||document.getElementById('lkUrl').value.trim(); if(!tx){closeLink();return;} var a='<a href="#ex">'+esc(tx)+'</a>'; ct.focus(); var sel=window.getSelection(); if(saved){sel.removeAllRanges();sel.addRange(saved);document.execCommand('insertHTML',false,a);} else {ct.insertAdjacentHTML('beforeend','<p>'+a+'</p>');} S.content=ct.innerHTML;persist();closeLink();});
+    document.getElementById('pvBtn').addEventListener('click',function(){S.content=ct.innerHTML;S.preview=!S.preview;show('p04',true);document.getElementById('pvBtn').focus();});
+    var pc=document.getElementById('pvClose'); if(pc) pc.addEventListener('click',function(){S.preview=false;show('p04',true);document.getElementById('pvBtn').focus();});
+    document.getElementById('cancelBtn').addEventListener('click',function(){S.content=ct.innerHTML;document.getElementById('cancelDlg').showModal();document.getElementById('keepBtn').focus();});
+    document.getElementById('pubBtn').addEventListener('click',publish);
+    var tr=document.getElementById('toResults'); if(tr) tr.addEventListener('click',function(e){e.preventDefault();persist();if(!S.query)S.query=S.title;go('p01');});
+    var rb=document.getElementById('restoreBtn'); if(rb) rb.addEventListener('click',function(){S.content=S.restoreOffer.content;S.summary=S.restoreOffer.summary||S.summary;S.draftAt=S.restoreOffer.at;S.restoreOffer=null;S.banner='<div class="notice n-ok">'+ICON.ok+'<p>Borrador restaurado. Puedes seguir donde lo dejaste.</p></div>';show('p04');});
+    var db=document.getElementById('dropDraftBtn'); if(db) db.addEventListener('click',function(){ls('del');S.restoreOffer=null;S.draftAt=0;S.banner='';show('p04');flash('Borrador descartado.');});
+  }
+  if(id==='p05'){
+    Array.prototype.slice.call(view.querySelectorAll('[data-tab]')).forEach(function(b){b.addEventListener('click',function(){var k=b.getAttribute('data-tab'); if(k==='editar'){S.preview=false;S.banner='';S.summary='Actualización de la página: '+S.title;go('p04');return;} if(k==='discusion'){flash('La discusión no forma parte del prototipo B.');return;} S.tab=k;show('p05',true);view.querySelector('[data-tab="'+k+'"]').focus();});});
+    var tx=document.getElementById('toastX'); if(tx) tx.addEventListener('click',function(){S.toast=false;show('p05',true);view.querySelector('h1').focus();});
+    var th=document.getElementById('toHist'); if(th) th.addEventListener('click',function(e){e.preventDefault();S.tab='historial';show('p05',true);view.querySelector('[data-tab="historial"]').focus();});
+  }
+  if(id==='p06'){
+    document.getElementById('loginBtn').addEventListener('click',function(){S.loginWait=true;show('p06',true);document.getElementById('loginBtn').focus();setTimeout(function(){S.loginWait=false;document.getElementById('expire').checked=false;S.banner='<div class="notice n-ok">'+ICON.ok+'<p><strong>Sesión iniciada.</strong> Tu texto está como lo dejaste. Revísalo y publica cuando quieras.</p></div>';go('p04');},1200);});
+  }
+}
+
+function startEditor(title,from){
+  S.title=title; S.from=from; S.preview=false; S.banner=''; S.toast=false; S.tab='leer';
+  if(!S.summary||S.summary.indexOf('Creación de la página')===0){S.summary='Creación de la página: '+title;}
+  var d=ls('get');
+  if(d&&d.title===title&&d.content&&!S.content){S.restoreOffer=d;} else {S.restoreOffer=null;}
+  go('p04');
+}
+
+function publish(){
+  var ct=document.getElementById('content'); S.content=ct.innerHTML; S.summary=document.getElementById('sum').value;
+  if(!words(S.content)){S.banner='<div class="notice n-err" id="emptyErr">'+ICON.err+'<p>Escribe el contenido de la página antes de publicarla.</p></div>';show('p04',true);document.getElementById('content').focus();return;}
+  persist(); S.publishing=true; S.banner=''; show('p04',true); document.getElementById('pubBtn').focus();
+  setTimeout(function(){
+    S.publishing=false;
+    if(document.getElementById('expire').checked){go('p06');hint('Estado de error: la sesión venció. El texto se conserva. Pulsa «Iniciar sesión de nuevo».');return;}
+    var bytes=new Blob([S.content]).size;
+    S.revs.push({n:S.revs.length+1,sum:S.summary,bytes:bytes,at:'Hoy, '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})});
+    ls('del'); S.draftAt=0; S.toast=true; S.tab='leer'; S.banner=''; go('p05');
+    hint('Confirmación: la página quedó publicada y la revisión aparece en el historial.');
+  },1600);
+}
+
+/* ---------------- dialog ---------------- */
+document.getElementById('keepBtn').addEventListener('click',function(){document.getElementById('cancelDlg').close();});
+document.getElementById('cancelDlg').addEventListener('close',function(){var c=document.getElementById('cancelBtn'); if(c&&current==='p04') c.focus();});
+document.getElementById('discardBtn').addEventListener('click',function(){document.getElementById('cancelDlg').close();ls('del');S.content='';S.draftAt=0;S.restoreOffer=null;var t=S.revs.length?S.title:'';S.title=t;S.banner='';S.p02msg='Borrador descartado. No se publicó ninguna página.';go('p02');});
+
+/* ---------------- header and out-of-scope ---------------- */
+document.getElementById('searchForm').addEventListener('submit',function(e){e.preventDefault();var v=document.getElementById('q').value.trim(); if(!v) return; S.query=v; go('p01');});
+document.getElementById('menuBtn').addEventListener('click',function(){var s=document.getElementById('side');var o=s.classList.toggle('open');this.setAttribute('aria-expanded',String(o));this.setAttribute('aria-label',o?'Cerrar menú':'Abrir menú');});
+document.addEventListener('click',function(e){
+  var o=e.target.closest('[data-oos]'); if(o){e.preventDefault();flash('Esta opción no forma parte del prototipo B.');return;}
+  if(e.defaultPrevented) return;
+  var a=e.target.closest('a[href^="#p"]'); if(!a||a.closest('#content')) return;
+  e.preventDefault(); var id=a.getAttribute('href').slice(1);
+  if(id==='p03'&&current!=='p04'){S.title='';S.titleErr='';S.content='';S.summary='';S.restoreOffer=null;}
+  if(current==='p04'){persist();}
+  go(id);
+});
+
+/* ---------------- prototype controls ---------------- */
+Array.prototype.slice.call(document.querySelectorAll('[data-dev]')).forEach(function(b){b.addEventListener('click',function(){dev.setAttribute('data-device',b.getAttribute('data-dev'));Array.prototype.slice.call(document.querySelectorAll('[data-dev]')).forEach(function(x){x.setAttribute('aria-pressed',String(x===b));});});});
+document.getElementById('sample').addEventListener('click',function(){ if(current!=='p04'){flash('Abre primero el editor (P04).');return;} S.content=SAMPLE; show('p04',true); persist(); document.getElementById('content').focus(); });
+document.getElementById('reopen').addEventListener('click',function(){ if(current!=='p04'||!words(S.content)){flash('Escribe o pega contenido en el editor antes de simular el cierre.');return;} persist(); var t=S.title; S.content='';S.summary='';S.draftAt=0;S.preview=false;S.banner=''; startEditor(t,S.from); hint('Recuperación: al reabrir el editor se ofrece restaurar el borrador.'); });
+document.getElementById('reset').addEventListener('click',function(){ls('del');S={query:'',title:'',from:'',content:'',summary:'',preview:false,publishing:false,revs:[],toast:false,tab:'leer',banner:'',draftAt:0,restoreOffer:null,loginWait:false,titleErr:'',p02msg:''};document.getElementById('expire').checked=false;document.getElementById('route').value='';hint('Prototipo reiniciado.');go('p02');});
+document.getElementById('route').addEventListener('change',function(e){
+  var v=e.target.value; document.getElementById('reset').click(); e.target.value=v;
+  if(v==='feliz'){go('p02');var q=document.getElementById('q');q.value='Procedimiento de respaldo de datos';q.focus();hint('Feliz: pulsa Intro para buscar, crea la página, pega el contenido de ejemplo, abre la vista previa y publica.');}
+  if(v==='alt'){go('p02');document.getElementById('createBtn').focus();hint('Alternativo: pulsa «Crear una página», escribe el título y observa las páginas parecidas antes de continuar.');}
+  if(v==='adv'){S.query='Procedimiento de respaldo de datos';startEditor(S.query,'search');S.content=SAMPLE;show('p04',true);persist();document.getElementById('expire').checked=true;document.getElementById('pubBtn').focus();hint('Adverso: la sesión vencerá al publicar. Pulsa «Publicar página» y observa la espera, el error y la recuperación.');}
+  if(v==='restore'){S.query='Procedimiento de respaldo de datos';startEditor(S.query,'search');S.content=SAMPLE;show('p04',true);persist();hint('Recuperación: pulsa «Simular cierre y reapertura» en estos controles.');}
+});
+setInterval(function(){var d=document.getElementById('draft'); if(d&&S.draftAt) d.innerHTML=draftStatus();},5000);
+
+show((location.hash||'#p02').slice(1).replace('ex','p02'));
+})();
+</script>
+
+<!--claude-mermaid-runtime-begin:3477-->
+<style>.mermaid-diagram{margin-block:4px}.mermaid-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+<script>(function(){
+var CFG={"palettes":{"light":{"surface":"#f4efe4","text":"#42392e","line":"#8a7f6d","border":"#7a6c52","bg":"#fffdf8"},"dark":{"surface":"#262b34","text":"#f2f3f5","line":"#a8adb8","border":"#9aa4b8","bg":"#1f232b"}}};
+if(typeof mermaid==='undefined')return;
+var pres=Array.prototype.slice.call(document.querySelectorAll('pre.mermaid')).filter(function(p){if(p.hasAttribute('data-claude-mermaid-claimed'))return false;p.setAttribute('data-claude-mermaid-claimed','1');return true;});
+if(!pres.length)return;
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+var root=document.documentElement;
+var items=pres.map(function(pre){
+var mount=document.createElement('div');mount.className='mermaid-diagram';
+return {pre:pre,mount:mount,src:pre.textContent||''};
+});
+var seq=0;
+var renderGen=0;
+var lastKey='';
+function pageBg(fallback){
+var els=[document.body,document.documentElement];
+for(var i=0;i<els.length;i++){
+var c=els[i]&&getComputedStyle(els[i]).backgroundColor;
+if(c&&c!=='transparent'&&c!=='rgba(0, 0, 0, 0)')return c;
+}
+return fallback;
+}
+function render(){
+var theme=root.getAttribute('data-theme');
+var dark=theme==='dark'||(!!(mq&&mq.matches)&&theme!=='light');
+var pal=dark?CFG.palettes.dark:CFG.palettes.light;
+var bg=pageBg(pal.bg);
+var key=(dark?'d':'l')+'|'+bg;
+if(key===lastKey)return;
+lastKey=key;
+var gen=++renderGen;
+var font=getComputedStyle(document.body).fontFamily||'sans-serif';
+var nat={useMaxWidth:false};
+mermaid.initialize({
+startOnLoad:false,securityLevel:'strict',theme:'base',
+flowchart:nat,sequence:nat,er:nat,state:nat,class:nat,pie:nat,
+gantt:nat,journey:nat,timeline:nat,gitGraph:nat,mindmap:nat,xyChart:nat,
+quadrantChart:nat,sankey:nat,c4:nat,requirement:nat,block:nat,
+packet:nat,kanban:nat,architecture:nat,radar:nat,
+themeVariables:{background:bg,mainBkg:pal.surface,primaryColor:pal.surface,
+primaryTextColor:pal.text,lineColor:pal.line,primaryBorderColor:pal.border,
+nodeBorder:pal.border,clusterBorder:pal.border,edgeLabelBackground:bg,
+clusterBkg:'rgba(127,127,127,0.07)',titleColor:pal.text,
+darkMode:dark,rowOdd:bg,rowEven:'rgba(127,127,127,0.07)',
+attributeBackgroundColorOdd:bg,attributeBackgroundColorEven:'rgba(127,127,127,0.07)',
+fontSize:'16px',fontFamily:font},
+themeCSS:'.node rect, .node circle, .node polygon, .node path, .cluster rect { stroke-width: 2px; }'
+});
+items.forEach(function(it){
+var id='claude-mermaid-'+seq++;
+mermaid.render(id,it.src).then(function(r){
+if(gen!==renderGen)return;
+var prev=it.pre.previousElementSibling;
+if(prev&&prev.className==='mermaid-diagram'&&prev!==it.mount)return;
+it.mount.innerHTML=r.svg;
+if(!it.mount.parentNode)it.pre.parentNode.insertBefore(it.mount,it.pre);
+it.pre.style.display='none';
+},function(){
+var scratch=document.getElementById(id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+scratch=document.getElementById('d'+id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+if(gen!==renderGen)return;
+if(it.mount.parentNode)it.mount.parentNode.removeChild(it.mount);
+it.pre.style.display='';
+});
+});
+}
+render();
+if(mq&&mq.addEventListener)mq.addEventListener('change',render);
+if(typeof MutationObserver!=='undefined')new MutationObserver(render).observe(root,{attributes:true,attributeFilter:['data-theme']});
+})();</script>
+<!--claude-mermaid-runtime-end-->
+</body>
+</html>
